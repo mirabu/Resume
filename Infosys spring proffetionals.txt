@@ -1,0 +1,294 @@
+package com.infosys.utility;
+
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+@Aspect
+@Component
+public class LoggingAspect {
+
+    @Before("execution(* com.infosys.service.EWalletServiceImpl.addMoneyToWallet(..))")
+    public void logBeforeAddMoneyToWallet() {
+        SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+        Date date = new Date();
+        System.out.println("Logging at INFO level: " + formatter.format(date));
+    }
+}
+
+
+
+logging.file.name=Ewallet.log
+
+
+
+package com.infosys.service;
+
+import com.infosys.dao.EwalletDAO;
+import com.infosys.exception.EWalletException;
+import com.infosys.model.Transaction;
+import com.infosys.model.User;
+import com.infosys.model.User.TransactionType;
+import com.infosys.validator.Validator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class EWalletServiceImpl implements EwalletService {
+
+    private EwalletDAO eWalletDAO;
+    private Validator validator;
+
+    @Autowired
+    public void setEwalletDAO(EwalletDAO eWalletDAO) {
+        this.eWalletDAO = eWalletDAO;
+    }
+
+    @Autowired
+    public void setValidator(Validator validator) {
+        this.validator = validator;
+    }
+
+    @Override
+    public double addMoneyToWallet(Integer userId, Transaction transaction) throws EWalletException {
+        User user = eWalletDAO.getUser(userId);
+
+        if (user == null) {
+            throw new EWalletException(Service.INVALID_USERID);
+        }
+
+        double newBalance = user.getBalance();
+
+        switch (transaction.getTransactionType()) {
+            case CREDIT:
+                newBalance += transaction.getAmount();
+                break;
+            case DEBIT:
+                newBalance -= transaction.getAmount();
+                if (newBalance < 0) {
+                    throw new EWalletException(Service.NEGATIVE_BALANCE);
+                }
+                break;
+        }
+
+        List<Transaction> transactions = user.getWalletList();
+        transaction.setId(transactions.size() + 1);
+        transactions.add(transaction);
+
+        user.setWalletList(transactions);
+        user.setBalance(newBalance);
+
+        eWalletDAO.addMoneyToWallet(user);
+
+        return newBalance;
+    }
+
+    @Override
+    public double recharge(Integer userId, String plan) throws EWalletException {
+        if (!validator.validRechargeType(plan)) {
+            throw new EWalletException(Service.WRONG_PLAN_TYPE);
+        }
+
+        User user = eWalletDAO.getUser(userId);
+
+        if (user == null) {
+            throw new EWalletException(Service.INVALID_USERID);
+        }
+
+        List<Transaction> transactions = user.getWalletList();
+        int transactionId = transactions.get(transactions.size() - 1).getId() + 1;
+
+        Transaction transaction = new Transaction();
+        transaction.setId(transactionId);
+        transaction.setTransactionType(TransactionType.DEBIT);
+        transaction.setDate("currentDate"); // Replace with actual current date
+        transaction.setTime("currentTime"); // Replace with actual current time
+
+        switch (plan) {
+            case "GOLD":
+                transaction.setAmount(100);
+                break;
+            case "SILVER":
+                transaction.setAmount(50);
+                break;
+        }
+
+        validator.checkMinimumBalance(user, transaction);
+
+        double updatedBalance = user.getBalance() - transaction.getAmount();
+        user.setBalance(updatedBalance);
+
+        transactions.add(transaction);
+        user.setWalletList(transactions);
+
+        eWalletDAO.recharge(user);
+
+        return updatedBalance;
+    }
+
+    @Override
+    public List<Transaction> displayTransactions(Integer userId) throws EWalletException {
+        List<Transaction> transactions = eWalletDAO.displayTransactions(userId);
+
+        if (transactions.isEmpty()) {
+            throw new EWalletException(Service.EMPTY_LIST);
+        }
+
+        return transactions;
+    }
+}
+
+
+
+
+
+package com.infosys.service;
+
+import com.infosys.dao.EwalletDAO;
+import com.infosys.exception.EWalletException;
+import com.infosys.model.Transaction;
+import com.infosys.model.User;
+import com.infosys.model.User.TransactionType;
+import com.infosys.validator.Validator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class EWalletServiceImpl implements EwalletService {
+
+    private EwalletDAO eWalletDAO;
+    private Validator validator;
+
+    @Autowired
+    public void setEwalletDAO(EwalletDAO eWalletDAO) {
+        this.eWalletDAO = eWalletDAO;
+    }
+
+    @Autowired
+    public void setValidator(Validator validator) {
+        this.validator = validator;
+    }
+
+    @Override
+    public double addMoneyToWallet(Integer userId, Transaction transaction) throws EWalletException {
+        User user = eWalletDAO.getUser(userId);
+
+        if (user == null) {
+            throw new EWalletException(Service.INVALID_USERID);
+        }
+
+        double newBalance = user.getBalance();
+
+        switch (transaction.getTransactionType()) {
+            case CREDIT:
+                newBalance += transaction.getAmount();
+                break;
+            case DEBIT:
+                newBalance -= transaction.getAmount();
+                if (newBalance < 0) {
+                    throw new EWalletException(Service.NEGATIVE_BALANCE);
+                }
+                break;
+        }
+
+        List<Transaction> transactions = user.getWalletList();
+        transaction.setId(transactions.size() + 1);
+        transactions.add(transaction);
+
+        user.setWalletList(transactions);
+        user.setBalance(newBalance);
+
+        eWalletDAO.addMoneyToWallet(user);
+
+        return newBalance;
+    }
+
+    @Override
+    public double recharge(Integer userId, String plan) throws EWalletException {
+        if (!validator.validRechargeType(plan)) {
+            throw new EWalletException(Service.WRONG_PLAN_TYPE);
+        }
+
+        User user = eWalletDAO.getUser(userId);
+
+        if (user == null) {
+            throw new EWalletException(Service.INVALID_USERID);
+        }
+
+        List<Transaction> transactions = user.getWalletList();
+        int transactionId = transactions.get(transactions.size() - 1).getId() + 1;
+
+        Transaction transaction = new Transaction();
+        transaction.setId(transactionId);
+        transaction.setTransactionType(TransactionType.DEBIT);
+        transaction.setDate("currentDate"); // Replace with actual current date
+        transaction.setTime("currentTime"); // Replace with actual current time
+
+        switch (plan) {
+            case "GOLD":
+                transaction.setAmount(100);
+                break;
+            case "SILVER":
+                transaction.setAmount(50);
+                break;
+        }
+
+        validator.checkMinimumBalance(user, transaction);
+
+        double updatedBalance = user.getBalance() - transaction.getAmount();
+        user.setBalance(updatedBalance);
+
+        transactions.add(transaction);
+        user.setWalletList(transactions);
+
+        eWalletDAO.recharge(user);
+
+        return updatedBalance;
+    }
+
+    @Override
+    public List<Transaction> displayTransactions(Integer userId) throws EWalletException {
+        List<Transaction> transactions = eWalletDAO.displayTransactions(userId);
+
+        if (transactions.isEmpty()) {
+            throw new EWalletException(Service.EMPTY_LIST);
+        }
+
+        return transactions;
+    }
+}
+
+
+
+
+
+
+package com.infosys;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.PropertySource;
+
+@SpringBootApplication
+@ComponentScan("com.infosys")
+@PropertySource("classpath:messages.properties")
+public class EWalletApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(EWalletApplication.class, args);
+    }
+}
+
+
+
+
+
+
